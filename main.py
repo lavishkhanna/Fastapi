@@ -3,6 +3,7 @@ import requests
 
 app=FastAPI()
 
+#skeleton apis
 @app.get('/')
 def home():
     return {"message":"Hello World"}
@@ -10,3 +11,4 @@ def home():
 @app.get('/about')
 def about():
     return {"message":"About Us"}
+
