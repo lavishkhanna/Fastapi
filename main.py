@@ -1,6 +1,39 @@
 from fastapi import FastAPI, HTTPException,Path,Query
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, computed_field, Field
+from typing import Annotated, Literal
 import json
 import requests
+
+class Patient(BaseModel):
+
+    id: Annotated[str, Field(..., description='ID of the patient', examples=['P001'])]
+    name: Annotated[str, Field(..., description='Name of the patient')]
+    city: Annotated[str, Field(..., description='City where the patient is living')]
+    age: Annotated[int, Field(..., gt=0, lt=120, description='Age of the patient')]
+    gender: Annotated[Literal['male', 'female', 'others'], Field(..., description='Gender of the patient')]
+    height: Annotated[float, Field(..., gt=0, description='Height of the patient in mtrs')]
+    weight: Annotated[float, Field(..., gt=0, description='Weight of the patient in kgs')]
+
+    @computed_field
+    @property
+    def bmi(self) -> float:
+        bmi = round(self.weight/(self.height**2),2)
+        return bmi
+    
+    @computed_field
+    @property
+    def verdict(self) -> str:
+
+        if self.bmi < 18.5:
+            return 'Underweight'
+        elif self.bmi < 25:
+            return 'Normal'
+        elif self.bmi < 30:
+            return 'Normal'
+        else:
+            return 'Obese'
+
 
 app=FastAPI()
 
@@ -20,6 +53,10 @@ def load_data():
     with open('patients.json', 'r') as f:
         data = json.load(f)
     return data
+
+def save_data(data):
+    with open('patients.json', 'w') as f:
+        json.dump(data, f, indent=4)
 
 # we pass param in url and we can access it in function, we must specify the type of param in function, here we are passing patient_id as string, this is specified in the arguments of function
 
@@ -64,3 +101,17 @@ def sort_patients(sort_by: str = Query(..., description='Sort on the basis of he
 
 # difference between path params and query params is that path params are used to identify a specific resource and query params are used to filter or sort the data, path params are mandatory and query params are optional, path params are defined in the url and query params are passed after ? in the url, path params are accessed in function using Path and query params are accessed in function using Query.
 #path params are used to identify a specific resource and query params are used to filter or sort the data, path params are mandatory and query params are optional, path params are defined in the url and query params are passed after ? in the url, path params are accessed in function using Path and query params are accessed in function using Query.
+
+
+# POST API
+@app.post('/create-patient')
+def create_patient(patient:Patient):
+
+    data=load_data()
+
+    if patient.id in data:
+        raise HTTPException(status_code=400, detail='Patient with this ID already exists')
+    
+    data[patient.id] = patient.model_dump(exclude=['id'])
+    save_data(data)
+    return JSONResponse(content={"message": "Patient created successfully", "patient_id": patient.id}, status_code=201)
